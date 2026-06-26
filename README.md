@@ -1,77 +1,76 @@
 # Intelligent Document Parser — Benchmark Suite
 
-> A reproducible, head-to-head benchmark comparing **Azure Document Intelligence**, **AWS Textract**, and **Google Document AI** on text extraction, table detection, and key-value pair identification across a shared test corpus.
+> A reproducible benchmark evaluating cloud document intelligence services on text extraction, table detection, and key-value pair identification across a shared test corpus.
 
----
-
-## What This Benchmarks
-
-Three cloud document intelligence services are run against the same set of test documents and measured across a consistent set of dimensions:
-
-| Dimension | What is measured |
-|-----------|-----------------|
-| Text extraction accuracy | Character-level accuracy vs. manually verified ground truth |
-| Table structure detection | Row/column detection rate, merged cell handling |
-| Key-value pair extraction | Field identification and value accuracy |
-| Latency | End-to-end API response time per page (median of 3 runs) |
-| Cost per page | Based on published pricing at time of benchmark |
+**Current status:** AWS Textract is live. Azure Document Intelligence and Google Document AI will be added once account setup is complete.
 
 ---
 
 ## Providers
 
-| Provider | Service | Region | Free Tier |
-|----------|---------|--------|-----------|
-| **Microsoft Azure** | Document Intelligence (`prebuilt-layout`) | Australia East (`australiaeast`) | 500 pages/month |
-| **Amazon Web Services** | Textract (`AnalyzeDocument`) | Sydney (`ap-southeast-2`) | 1,000 pages/month (first 3 months) |
-| **Google Cloud** | Document AI (Form Parser) | US East (`us-east1`) | 1,000 pages/month |
+| Provider | Service | Region | Status |
+|----------|---------|--------|--------|
+| **Amazon Web Services** | Textract (`AnalyzeDocument`) | Sydney (`ap-southeast-2`) | Live ✓ |
+| **Microsoft Azure** | Document Intelligence (`prebuilt-layout`) | Australia East (`australiaeast`) | Coming soon |
+| **Google Cloud** | Document AI (Form Parser) | US East (`us-east1`) | Coming soon |
 
-> **Data residency note:** Google Document AI has no Australian region. It is included for feature comparison only. Documents sent to Google are processed in the US. Do not use for data subject to Australian data residency requirements.
+> **Data residency note:** Google Document AI has no Australian region. It will be included for feature comparison only — documents are processed in the US.
+
+---
+
+## What Gets Measured
+
+| Dimension | What is measured |
+|-----------|-----------------|
+| Text extraction | Character-level accuracy vs. manually verified ground truth |
+| Table structure | Row/column detection rate, merged cell handling |
+| Key-value pairs | Field identification and value accuracy |
+| Latency | End-to-end API response time per page (median of 3 runs) |
+| Cost per page | Based on published pricing at time of benchmark |
+
+---
+
+## Test Corpus
+
+Five documents covering a range of document types and quality:
+
+| File | Type |
+|------|------|
+| `berkshire-10k.png` | Financial report — dense text and tables |
+| `declaration.jpg` | Historical document — old typography |
+| `sears-1902.png` | Historical catalogue — multi-column layout |
+| `vertical-ai-research-labs.png` | Modern document — clean layout, KV pairs |
+| `wright-patent.png` | Patent — technical text |
 
 ---
 
 ## Prerequisites
 
-### Python
-
-Python **3.12+** is required.
-
+**Python 3.12+**
 ```bash
 python3.12 --version
-# Python 3.12.x
 
 # macOS: install via Homebrew if needed
 brew install python@3.12
 ```
 
-### Cloud CLIs
-
-Optional but strongly recommended for initial account setup and credential verification:
-
+**AWS CLI**
 ```bash
-brew install azure-cli             # az
-brew install awscli                # aws
-brew install --cask google-cloud-sdk  # gcloud
+brew install awscli
 ```
 
 ---
 
-## Credentials You Will Need
+## Credentials
 
-Before running any benchmarks, collect the following from each provider's console. Store them in a `.env` file (see Setup below — this file is gitignored and must never be committed).
+Store credentials in a `.env` file at the project root. This file is gitignored — never commit it.
 
-### Azure Document Intelligence
-
-Found in: **Azure Portal → your Document Intelligence resource → Keys and Endpoint**
-
-```
-AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://<resource-name>.cognitiveservices.azure.com/
-AZURE_DOCUMENT_INTELLIGENCE_KEY=<Key 1 or Key 2>
+```bash
+cp .env.example .env
+# Fill in your AWS keys
 ```
 
-### AWS Textract
-
-Found in: **AWS Console → IAM → Users → your user → Security credentials → Access keys**
+**AWS Textract** — found in: AWS Console → IAM → Users → your user → Security credentials → Access keys
 
 ```
 AWS_ACCESS_KEY_ID=<your key ID>
@@ -79,20 +78,7 @@ AWS_SECRET_ACCESS_KEY=<your secret key>
 AWS_DEFAULT_REGION=ap-southeast-2
 ```
 
-Ensure your IAM user or role has the `AmazonTextractFullAccess` policy attached (or a scoped policy permitting `textract:AnalyzeDocument`).
-
-### Google Document AI
-
-Found in: **GCP Console → IAM & Admin → Service Accounts → your service account → Keys**
-
-```
-GOOGLE_APPLICATION_CREDENTIALS=./credentials/gcp-service-account.json
-GCP_PROJECT_ID=<your-project-id>
-GCP_PROCESSOR_ID=<your-processor-id>
-GCP_LOCATION=us
-```
-
-Place your downloaded service account JSON file at `credentials/gcp-service-account.json`. This path is gitignored.
+Ensure your IAM user has `AmazonTextractFullAccess` attached.
 
 ---
 
@@ -100,138 +86,73 @@ Place your downloaded service account JSON file at `credentials/gcp-service-acco
 
 ```
 idp-benchmark/
-├── .env                              # All credentials (gitignored)
-├── .env.example                      # Template — commit this, not .env
+├── .env                          # Credentials (gitignored)
+├── .env.example                  # Template — safe to commit
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
-│
-├── credentials/
-│   └── gcp-service-account.json      # GCP service account key (gitignored)
+├── smoke_test.py                 # Quick end-to-end test
 │
 ├── documents/
-│   ├── test_corpus/                  # Input PDFs for benchmarking
-│   └── ground_truth/                 # Expected extraction results (JSON)
+│   ├── test_corpus/              # Input documents
+│   └── ground_truth/             # Expected results (JSON) — coming soon
 │
-├── src/
-│   ├── providers/
-│   │   ├── __init__.py
-│   │   ├── base.py                   # Abstract base class all providers implement
-│   │   ├── azure.py                  # Azure Document Intelligence client
-│   │   ├── aws.py                    # AWS Textract client
-│   │   └── gcp.py                    # Google Document AI client
-│   │
-│   ├── benchmark/
-│   │   ├── __init__.py
-│   │   ├── runner.py                 # Orchestrates runs across providers/documents
-│   │   ├── metrics.py                # Accuracy, latency, and cost calculations
-│   │   └── report.py                 # Generates comparison output (JSON + HTML)
-│   │
-│   └── utils/
-│       ├── __init__.py
-│       └── document.py               # Shared document loading and normalisation
-│
-├── tests/
-│   ├── test_azure.py
-│   ├── test_aws.py
-│   └── test_gcp.py
-│
-└── results/
-    └── .gitkeep                      # Benchmark output lands here (gitignored)
+└── src/
+    └── providers/
+        ├── base.py               # Abstract base class + result dataclasses
+        └── aws.py                # AWS Textract client
 ```
 
 ---
 
 ## Setup
 
-### 1. Create a virtual environment
-
 ```bash
-cd idp-benchmark
+# Create virtual environment
 /opt/homebrew/opt/python@3.12/bin/python3.12 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-```
 
-### 2. Configure credentials
-
-```bash
+# Configure credentials
 cp .env.example .env
-# Open .env and fill in your values for each provider
-```
+# Edit .env with your AWS keys
 
-### 3. Verify connections
-
-Once credentials are in place, verify each provider before running benchmarks:
-
-```bash
-python -m src.providers.azure --verify
+# Verify AWS connection
+set -a; source .env; set +a
 python -m src.providers.aws --verify
-python -m src.providers.gcp --verify
-```
-
-Each command sends a minimal test request and prints the service version or a confirmation response.
-
----
-
-## Running Benchmarks
-
-### Run all providers against the full test corpus
-
-```bash
-python -m src.benchmark.runner --all
-```
-
-### Run a single provider
-
-```bash
-python -m src.benchmark.runner --provider azure
-python -m src.benchmark.runner --provider aws
-python -m src.benchmark.runner --provider gcp
-```
-
-### Run against a single document
-
-```bash
-python -m src.benchmark.runner --provider azure --doc documents/test_corpus/invoice_sample.pdf
-```
-
-### Generate a comparison report
-
-```bash
-python -m src.benchmark.report --input results/latest/ --format html
 ```
 
 ---
 
-## Understanding Results
+## Running
 
-Each benchmark run writes output to a timestamped directory under `results/`:
-
-```
-results/
-└── 20260626_143000/
-    ├── azure_results.json
-    ├── aws_results.json
-    ├── gcp_results.json
-    └── comparison_report.html
+**Smoke test — all documents through Textract:**
+```bash
+set -a; source .env; set +a
+.venv/bin/python smoke_test.py
 ```
 
-Each result file follows this schema:
+**Single document:**
+```bash
+.venv/bin/python smoke_test.py documents/test_corpus/berkshire-10k.png
+```
+
+---
+
+## Result Schema
+
+Each document run returns:
 
 ```json
 {
-  "provider": "azure",
-  "document": "invoice_sample.pdf",
-  "pages": 2,
+  "provider": "aws",
+  "document": "berkshire-10k.png",
+  "pages": 1,
   "latency_ms": 1843,
-  "text_accuracy": 0.987,
-  "tables_detected": 3,
-  "table_structure_accuracy": 0.941,
-  "kv_pairs_extracted": 12,
-  "kv_accuracy": 0.917,
-  "cost_usd": 0.003
+  "raw_text": "...",
+  "tables": [{ "row_count": 5, "column_count": 3, "rows": [...] }],
+  "kv_pairs": [{ "key": "Date", "value": "2024-01-01", "confidence": 98.5 }]
 }
 ```
 
@@ -239,25 +160,13 @@ Each result file follows this schema:
 
 ## Pricing Reference
 
-As of June 2026. Always verify against current provider pricing pages before drawing cost conclusions.
+As of June 2026. Verify against current provider pricing pages before drawing cost conclusions.
 
 | Provider | Feature | Free Tier | Pay-as-you-go |
 |----------|---------|-----------|---------------|
+| AWS Textract | AnalyzeDocument (TABLES + FORMS) | 1,000 pages/month (first 3 months) | ~$1.50 / 1,000 pages |
 | Azure Document Intelligence | Layout (text + tables + KV) | 500 pages/month | ~$1.50 / 1,000 pages |
-| AWS Textract | AnalyzeDocument (TABLES + FORMS) | 1,000 pages/month (3 months) | ~$1.50 / 1,000 pages |
 | Google Document AI | Form Parser | 1,000 pages/month | ~$1.50 / 1,000 pages |
-
-> AWS Textract pricing note: `AnalyzeDocument` (tables + forms) costs more than `DetectDocumentText` (text only). This benchmark uses `AnalyzeDocument` to enable a fair feature comparison.
-
----
-
-## Limitations
-
-- **Google data residency:** No Australian region. Documents are processed in `us-east1`. Factor this into any compliance assessment.
-- **Ground truth dependency:** Accuracy scores are relative to this project's manually verified test corpus. Results will differ across document types and quality.
-- **Latency variability:** Measured values depend on document size, provider load, and network conditions. Median of 3 runs is reported per document.
-- **Free tier exhaustion:** If you exceed the free tier during benchmarking, charges will apply to your account. Monitor usage in each provider's console.
-- **Model versions:** Cloud providers update their underlying models. Results should be tagged with the API version used (captured automatically in result JSON).
 
 ---
 
